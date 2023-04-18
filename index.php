@@ -9,14 +9,69 @@ Author URI:
 License: GPL2
  */
 
-add_shortcode('mi_plugin_form', 'mi_plugin_formulario');
 
-// Función que muestra el formulario
 
-// Función para procesar el formulario
-function mi_plugin_procesar_formulario()
-{
-    if (isset($_POST['monto']) && isset($_POST['numero']) && isset($_POST['mes']) && isset($_POST['ano']) && isset($_POST['cvc']) && isset($_POST['direccion_postal']) && isset($_POST['referencia'])) {
+
+ if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly
+}
+// require_once(plugin_dir_path(__FILE__) . 'includes/formularioBanco.php');
+add_action( 'woocommerce_checkout_before_order_review', 'mi_plugin_formulario_de_pago' );
+function mi_plugin_formulario_de_pago() {
+    // Obtiene el monto total del carrito de Woocommerce
+    $monto = WC()->cart->total;
+    ?>
+    <div id="mi-plugin-pago">
+        <h3><?php _e( 'Pago seguro con tarjeta', 'mi-plugin' ); ?></h3>
+        <form method="post" id="mi-plugin-pago-formulario">
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-monto"><?php _e( 'Monto', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-monto" id="mi-plugin-pago-monto" value="<?php echo esc_attr( $monto ); ?>" readonly>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-numero"><?php _e( 'Número de tarjeta', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-numero" id="mi-plugin-pago-numero" placeholder="<?php esc_attr_e( 'Número de tarjeta', 'mi-plugin' ); ?>" required>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-mes"><?php _e( 'Mes de expiración', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-mes" id="mi-plugin-pago-mes" placeholder="<?php esc_attr_e( 'MM', 'mi-plugin' ); ?>" required>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-ano"><?php _e( 'Año de expiración', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-ano" id="mi-plugin-pago-ano" placeholder="<?php esc_attr_e( 'YYYY', 'mi-plugin' ); ?>" required>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-cvc"><?php _e( 'CVC', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-cvc" id="mi-plugin-pago-cvc" placeholder="<?php esc_attr_e( 'CVC', 'mi-plugin' ); ?>" required>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-direccion"><?php _e( 'Dirección de facturación', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-direccion" id="mi-plugin-pago-direccion" placeholder="<?php esc_attr_e( 'Dirección de facturación', 'mi-plugin' ); ?>" required>
+            </div>
+            <div class="form-row form-row-wide">
+                <label for="mi-plugin-pago-referencia"><?php _e( 'Referencia', 'mi-plugin' ); ?> <span class="required">*</span></label>
+                <input type="text" class="input-text" name="mi-plugin-pago-referencia" id="mi-plugin-pago-referencia" placeholder="<?php esc_attr_e( 'Referencia', 'mi-plugin' ); ?>" required>
+            </div>
+            <?php wp_nonce_field( 'mi-plugin-pago', 'mi-plugin-pago-nonce' ); ?>
+            <button type="submit" class="button alt" id="mi-plugin-pago-submit"><?php _e( 'Pagar', 'mi-plugin' ); ?></button>
+        </form>
+    </div>
+    <?php
+}
+
+// Procesa el pago cuando se envía el formulario
+add_action( 'init', 'mi_plugin_procesa_pago' );
+function mi_plugin_procesa_pago() {
+    if ( isset( $_POST['mi-plugin-pago-nonce'] ) && wp_verify_nonce( $_POST['mi-plugin-pago-nonce'], 'mi-plugin-pago' ) ) {
+        // Obtiene los datos del formulario
+        $monto = $_POST['mi-plugin-pago-monto'];
+        $numero = $_POST['mi-plugin-pago-numero'];
+        $mes = $_POST['mi-plugin-pago-mes'];
+        $ano = $_POST['mi-plugin-pago-ano'];
+        $direccion = $_POST['mi-plugin-pago-direccion'];
+        $cvc = $_POST['mi-plugin-pago-cvc'];
+        $cvc = $_POST['mi-plugin-pago-referencia'];
+        // Consume el servicio adicional para procesar el pago
         $url = 'http://devpagos.sitca-ve.com/api/v1/cargo';
         $args = array(
             'method' => 'POST',
@@ -24,77 +79,25 @@ function mi_plugin_procesar_formulario()
                 'apikey' => 'pk4458cf90-2512-300b-b021-722c526f03c3',
             ),
             'body' => array(
-                'monto' => $_POST['monto'],
-                'numero' => $_POST['numero'],
-                'mes' => $_POST['mes'],
-                'ano' => $_POST['ano'],
-                'cvc' => $_POST['cvc'],
-                'direccion_postal' => $_POST['direccion_postal'],
-                'referencia' => $_POST['referencia'],
+                'monto' => 1.5,
+                'numero' => $numero,
+                'mes' => $mes,
+                'ano' => $ano,
+                'direccion' => $direccion,
+                'cvc' => $cvc,
+                'referencia' => '123456789',
             ),
         );
-
-        $response = wp_remote_post($url, $args);
-
+        $response = wp_remote_post( $url, $args );
         if (is_wp_error($response)) {
             // Error al enviar la solicitud
-            echo strval($response);
+            wc_add_notice( __( 'Error al procesar el pago. Inténtalo de nuevo más tarde.', 'mi-plugin' ), 'error' );
             // echo 'Ocurrió un error al enviar la solicitud.';
         } else {
             // Solicitud enviada correctamente
-            $body = wp_remote_retrieve_body($response);
-            echo '<h2>La solicitud se envió correctamente. Respuesta: ' . $body.'</h2>';
+            WC()->cart->empty_cart();
+            wp_redirect( wc_get_checkout_url() . '?mi-plugin-pago-exito=true' );
+            exit;
         }
     }
 }
-
-add_action('init', 'mi_plugin_procesar_formulario');
-
-function mi_plugin_formulario()
-{
-    $output = '';
-
-    // Agrega el encabezado personalizado del formulario
-    $output .= '<div class="mi-plugin-header">';
-    $output .= '<h2>Mi formulario de pagos</h2>';
-    $output .= '<p>Por favor complete los siguientes campos:</p>';
-    $output .= '</div>';
-
-    // Agrega los campos del formulario
-    $output = '<form method="post">
-    <label for="monto">Monto:</label>
-    <input type="text" name="monto" id="monto"><br>
-    <label for="numero">Número de tarjeta:</label>
-    <input type="text" name="numero" id="numero"><br>
-    <label for="mes">Mes de expiración:</label>
-    <input type="text" name="mes" id="mes"><br>
-    <label for="ano">Año de expiración:</label>
-    <input type="text" name="ano" id="ano"><br>
-    <label for="cvc">CVC:</label>
-    <input type="text" name="cvc" id="cvc"><br>
-    <label for="direccion_postal">Dirección postal:</label>
-    <input type="text" name="direccion_postal" id="direccion_postal"><br>
-    <label for="referencia">Referencia:</label>
-    <input type="text" name="referencia" id="referencia"><br>
-    <input type="submit" value="Enviar">
-</form>';
-
-    // Agrega el estilo CSS para el encabezado personalizado
-    $output .= '<style>';
-    $output .= '.mi-plugin-header {';
-    $output .= '  background-color: #f2f2f2;';
-    $output .= '  padding: 20px;';
-    $output .= '  margin-bottom: 20px;';
-    $output .= '}';
-    $output .= '.mi-plugin-header h2 {';
-    $output .= '  margin: 0;';
-    $output .= '}';
-    $output .= '</style>';
-
-    return $output;
-}
-
-
-
-
-
