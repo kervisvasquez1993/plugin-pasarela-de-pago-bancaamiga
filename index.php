@@ -127,73 +127,68 @@ function mi_plugin_cargar()
                 <input type="text" class="input-text" name="mi-plugin-pago-referencia" id="mi-plugin-pago-referencia" placeholder="<?php esc_attr_e('Referencia', 'mi-plugin');?>" required>
             </div>
             <?php wp_nonce_field('mi-plugin-pago', 'mi-plugin-pago-nonce');?>
-            <button type="submit" class="button alt" id="mi-plugin-pago-submit"><?php _e('Pagar', 'mi-plugin');?></button>
+            <button type="submit" class="button alt" id="mi_funcion_procesar_pago"><?php _e('Pagar', 'mi-plugin');?></button>
         </form>
     </div>
     <?php
 }
 
-// Procesa el pago cuando se envía el formulario
-    // add_action('init', 'mi_plugin_procesa_pago');
-    // function mi_plugin_procesa_pago()
-    // {
-    //     if (isset($_POST['mi-plugin-pago-nonce']) && wp_verify_nonce($_POST['mi-plugin-pago-nonce'], 'mi-plugin-pago')) {
-    //         // Obtiene los datos del formulario
-    //         $monto = $_POST['mi-plugin-pago-monto'];
-    //         $numero = $_POST['mi-plugin-pago-numero'];
-    //         $mes = $_POST['mi-plugin-pago-mes'];
-    //         $ano = $_POST['mi-plugin-pago-ano'];
-    //         $direccion = $_POST['mi-plugin-pago-direccion'];
-    //         $cvc = $_POST['mi-plugin-pago-cvc'];
-    //         $referencia = $_POST['mi-plugin-pago-referencia'];
-    //         // Consume el servicio adicional para procesar el pago
-    //         $url = 'http://devpagos.sitca-ve.com/api/v1/cargo';
-    //         $args = array(
-    //             'method' => 'POST',
-    //             'headers' => array(
-    //                 'apikey' => 'pk4458cf90-2512-300b-b021-722c526f03c3',
-    //             ),
-    //             'body' => array(
-    //                 'monto' => $monto,
-    //                 'numero' => $numero,
-    //                 'mes' => $mes,
-    //                 'ano' => $ano,
-    //                 'direccion' => $direccion,
-    //                 'cvc' => $cvc,
-    //                 'referencia' => $referencia,
-    //             ),
-    //         );
-    //         $response = wp_safe_remote_post($url, $args);
-    //         // echo strval($response);
-    //         if (is_wp_error($response)) {
-    //             echo 'Ocurrió un error al enviar la solicitud.';
-    //             // Error al enviar la solicitud
-    //             // echo strval($response);
-    //             // $error_message = $response->get_error_message();
-    //             // Muestra un mensaje de error con el cuerpo de la respuesta
-    //             // echo '<p>Error: ' . $error_message . '</p>';
-    //             // echo 'Ocurrió un error al enviar la solicitud.';
-    //         } else {
-    //             // Solicitud enviada correctamente
-    //             $body = wp_remote_retrieve_body($response);
-    //             $respuesta = json_decode($body);
-    //             if ($respuesta->ok) {
-    //                 $order = wc_create_order();
-    //                 // crea aqui las opciones para procesar el pagoen woocommerce
+    add_action('woocommerce_checkout_process', 'mi_funcion_procesar_pago');
+    function mi_funcion_procesar_pago()
+    {
+        echo "hola";
+        if (isset($_POST['mi-plugin-pago-nonce']) && wp_verify_nonce($_POST['mi-plugin-pago-nonce'], 'mi-plugin-pago')) {
+            // Obtiene los datos del formulario
+            $monto = $_POST['mi-plugin-pago-monto'];
+            $numero = $_POST['mi-plugin-pago-numero'];
+            $mes = $_POST['mi-plugin-pago-mes'];
+            $ano = $_POST['mi-plugin-pago-ano'];
+            $direccion = $_POST['mi-plugin-pago-direccion'];
+            $cvc = $_POST['mi-plugin-pago-cvc'];
+            $referencia = $_POST['mi-plugin-pago-referencia'];
+            // Consume el servicio adicional para procesar el pago
+            $url = 'http://devpagos.sitca-ve.com/api/v1/cargo';
+            $args = array(
+                'method' => 'POST',
+                'headers' => array(
+                    'apikey' => 'pk4458cf90-2512-300b-b021-722c526f03c3',
+                ),
+                'body' => array(
+                    'monto' => $monto,
+                    'numero' => $numero,
+                    'mes' => $mes,
+                    'ano' => $ano,
+                    'direccion' => $direccion,
+                    'cvc' => $cvc,
+                    'referencia' => $referencia,
+                ),
+            );
+            $response = wp_safe_remote_post($url, $args);
+            echo "respuesta:";
+            if (is_wp_error($response)) {
+                // Error al responder la solicitud
+                echo "error: ";
+                wc_add_notice('No se pudo procesar el pago. Inténtalo de nuevo más tarde.', 'error');
+            } else {
+                // Solicitud enviada correctamente
+                $body = wp_remote_retrieve_body($response);
+                $respuesta = json_decode($body);
+                echo $respuesta;
+                if ($respuesta->ok) {
+                    $order = wc_create_order();
+                    // crea aqui las opciones para procesar el pagoen woocommerce
+                    // Procesar el pago correctamente
+                    $payment_gateway = wc_get_payment_gateway_by_order($order);
+                    $payment_gateway->process_payment($order_id);
+                    echo "registrado correctamente";
+                    // Agrega aquí cualquier otro método que necesites ejecutar después de procesar el pago
+                } else {
+                    // Error al procesar el pago
+                    wc_add_notice('No se pudo procesar el pago. Inténtalo de nuevo más tarde.', 'error');
+                }
+            }
+        }
+    }
 
-    //             } else {
-    //                 // Transacción rechazada
-
-    //                 // Agrega un mensaje de error en la página de finalizar compra
-    //                 wc_add_notice('Error en la transacción: ');
-
-    //                 // Redirige al usuario a la página de finalizar compra
-    //                 $checkout_url = wc_get_checkout_url();
-    //                 wp_redirect($checkout_url);
-    //                 exit;
-    //             }
-    //         }
-    //     }
-    // }
-
+    // add_action('woocommerce_thankyou', 'mi_plugin_procesa_pago');
 }
