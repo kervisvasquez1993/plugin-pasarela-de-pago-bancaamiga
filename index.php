@@ -134,6 +134,7 @@ function mi_plugin_cargar()
 }
 
     add_action('woocommerce_checkout_process', 'mi_funcion_procesar_pago');
+    // add_action('init', 'mi_funcion_procesar_pago');
     function mi_funcion_procesar_pago()
     {
         echo "hola";
@@ -178,8 +179,8 @@ function mi_plugin_cargar()
                     $order = wc_create_order();
                     // crea aqui las opciones para procesar el pagoen woocommerce
                     // Procesar el pago correctamente
-                    $payment_gateway = wc_get_payment_gateway_by_order($order);
-                    $payment_gateway->process_payment($order_id);
+                    // $payment_gateway = wc_get_payment_gateway_by_order($order);
+                    // $payment_gateway->process_payment($order_id);
                     echo "registrado correctamente";
                     // Agrega aquí cualquier otro método que necesites ejecutar después de procesar el pago
                 } else {
