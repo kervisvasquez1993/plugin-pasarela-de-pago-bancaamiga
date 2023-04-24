@@ -79,87 +79,72 @@ function init_wc_mi_metodo_pago()
         // Procese el pago y devuelva el resultado
         public function process_payment($order_id)
         {
-            
+
             global $woocommerce;
             $order = wc_get_order($order_id);
             // Aquí es donde debe enviar la información de la tarjeta al servicio externo utilizando la API.
 
             // Ejemplo de cómo enviar datos a la API utilizando cURL:
-            // $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
+            $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
 
             // enviar datos al servicor externo
             // Enviar los datos de pago al servicio externo
-            $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
+            $ch = curl_init();
             $apikey = 'pk4458cf90-2512-300b-b021-722c526f03c3';
             $headers = array(
-                'apikey' => $apikey,
-                'Content-Type' => 'application/x-www-form-urlencoded',
+                'apikey: pk4458cf90-2512-300b-b021-722c526f03c3',
+                'Content-Type: application/x-www-form-urlencoded',
             );
-            $body = array(
+            $data = array(
                 'numero_de_tarjeta' => $_POST['numero_de_tarjeta'],
-                'nombre' => $_POST['nombre'],
+                // 'nombre' => $_POST['nombre'],
                 'ano' => $_POST['anio'],
                 'mes' => $_POST['mes'],
                 'cvc' => $_POST['cvc'],
                 'referencia' => $_POST['referencia'],
-                'direccion' =>  $_POST['direccion'],
-                'monto' => "1,50",
+                'direccion' => $_POST['direccion'],
+                'monto' => $order->total,
             );
-            var_dump($body);
+            // var_dump($body);
             $args = array(
                 'method' => 'POST',
                 'headers' => $headers,
-                'body' => http_build_query($body),
+                'body' => http_build_query($data),
             );
+            // $response = wp_remote_post($url, $args);
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-            $response = wp_remote_post($url, $args);
-
-            // $ch = curl_init();
-            // echo $response;
-            if (is_wp_error($response)) {
-                // echo implode(',',body);
-                echo "error no se pudo conectar";
-                wc_add_notice('Hubo un error al procesar el pago. Por favor, inténtelo de nuevo más tarde.', 'error');
-                return;
-            }
-            else{
-                // echo "pago exitoso";
-            }
-
-            // $headers = array(
-            //     'apikey: pk4458cf90-2512-300b-b021-722c526f03c3',
-            //     'Content-Type: application/x-www-form-urlencoded',
-            // );
-
-            // curl_setopt($ch, CURLOPT_URL, $url);
-            // curl_setopt($ch, CURLOPT_POST, true);
-            // curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-            // curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            // curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-            // $response = curl_exec($ch);
-            // curl_close($ch);
-
-            // Analice la respuesta y verifique si el pago fue exitoso
-            // $response_data = json_decode($response);
+            $response = curl_exec($ch);
+            // var_dump($response);
+            var_dump($response);
+            curl_close($ch);
+            $response_data = json_decode($response);
             // var_dump($response_data);
-
-            // if ($response_data->ok === true) {
-            //     // Marque la orden como completada y vacíe el carrito
-            //     $order->update_status('completed');
-            //     $woocommerce->cart->empty_cart();
-
-            //     // Devuelva un mensaje de éxito
-            //     return array(
-            //         'result' => 'success',
-            //         'redirect' => $this->get_return_url($order),
-            //     );
-            // } else {
-            //     // Muestre un mensaje de error en el frontend de WooCommerce
-            //     wc_add_notice(__('Error en el pago. Por favor, inténtelo de nuevo o utilice un método de pago diferente.', 'woocommerce'), 'error');
+            var_dump($response_data);
+            // if (is_wp_error($response)) {
+            //     // var_dump($response);
+            //     echo "error no se establecio conexion";
+            //     wc_add_notice('Hubo un error al procesar el pago. Por favor, inténtelo de nuevo más tarde.', 'error');
             //     return;
+            // } else {
+            //     // echo "conexion establecida";
+            //     var_dump($response);
+            //     // echo "<br/>";
+            //     if($response->ok){
+            //         echo "pago exitoso";
+            //     }
+            //     else{
+            //         echo "pago fallido, revise los datos de su tarjeta";
+            //         // var_dump($response);
+            //     }
             // }
+
+            
+
         }
     }
 }
-

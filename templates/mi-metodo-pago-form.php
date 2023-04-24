@@ -9,10 +9,10 @@ if (!defined('ABSPATH')) {
     <input id="numero_de_tarjeta" name="numero_de_tarjeta" class="input-text wc-credit-card-form-card-number" type="text" autocomplete="off" placeholder="<?php _e('•••• •••• •••• ••••', 'woocommerce'); ?>" required>
 </div>
 
-<div class="form-row form-row-first">
+<!-- <div class="form-row form-row-first">
     <label for="nombre"><?php _e('Nombre en la tarjeta', 'woocommerce'); ?> <span class="required">*</span></label>
     <input id="nombre" name="nombre" class="input-text wc-credit-card-form-card-name" type="text" autocomplete="off" placeholder="<?php _e('Nombre Apellido', 'woocommerce'); ?>">
-</div>
+</div> -->
 
 <div class="form-row form-row-last">
     <label><?php _e('Fecha de vencimiento', 'woocommerce'); ?> <span class="required">*</span></label>
