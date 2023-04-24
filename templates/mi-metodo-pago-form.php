@@ -26,10 +26,10 @@ if (!defined('ABSPATH')) {
     <input id="cvc" name="cvc" class="input-text wc-credit-card-form-card-cvc" type="text" autocomplete="off" placeholder="<?php _e('•••', 'woocommerce'); ?>" required>
 </div>
 <div class="form-row form-row-wide">
-    <label for="referencia"><?php _e('(Referencia)', 'woocommerce'); ?> <span class="required">*</span></label>
-    <input id="referencia" name="referencia" class="input-text wc-credit-card-form-card-referencia" type="text" autocomplete="off" placeholder="<?php _e('Referencia', 'woocommerce'); ?>" required>
+    <label for="direccion"><?php _e('(Direccion)', 'woocommerce'); ?> <span class="required">*</span></label>
+    <input id="direccion" name="direccion" class="input-text wc-credit-card-form-card-direccion" type="text" autocomplete="off" placeholder="<?php _e('Direccion', 'woocommerce'); ?>" required>
 </div>
 <div class="form-row form-row-wide">
-    <label for="direccion"><?php _e('(Referencia)', 'woocommerce'); ?> <span class="required">*</span></label>
-    <input id="direccion" name="referencia" class="input-text wc-credit-card-form-card-referencia" type="text" autocomplete="off" placeholder="<?php _e('Referencia', 'woocommerce'); ?>" required>
+    <label for="referencia"><?php _e('(Referencia)', 'woocommerce'); ?> <span class="required">*</span></label>
+    <input id="referencia" name="referencia" class="input-text wc-credit-card-form-card-referencia" type="text" autocomplete="off" placeholder="<?php _e('Referencia', 'woocommerce'); ?>" required>
 </div>
