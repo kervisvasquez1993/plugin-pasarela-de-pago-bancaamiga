@@ -58,6 +58,12 @@ function init_wc_mi_metodo_pago()
                     'label' => __('Habilitar Mi Método de Pago', 'woocommerce'),
                     'default' => 'yes',
                 ),
+                'apikey' => array(
+                    'title' => __('API Key', 'woocommerce'),
+                    'type' => 'text',
+                    'description' => __('Ingrese su API Key.', 'woocommerce'),
+                    'default' => '',
+                ),
             );
         }
 
@@ -79,72 +85,77 @@ function init_wc_mi_metodo_pago()
         // Procese el pago y devuelva el resultado
         public function process_payment($order_id)
         {
-
             global $woocommerce;
             $order = wc_get_order($order_id);
-            // Aquí es donde debe enviar la información de la tarjeta al servicio externo utilizando la API.
+            $apikey = $this->get_option('apikey');
 
-            // Ejemplo de cómo enviar datos a la API utilizando cURL:
-            $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
+            // Verificar que se hayan enviado todos los datos necesarios
+            if (!isset($_POST['numero_de_tarjeta']) || !isset($_POST['anio']) || !isset($_POST['mes']) || !isset($_POST['cvc']) || !isset($_POST['referencia']) || !isset($_POST['direccion'])) {
+                wc_add_notice('Por favor, complete todos los campos requeridos.', 'error');
+                return;
+            }
 
-            // enviar datos al servicor externo
+            // Validar los datos de la tarjeta de crédito
+            $card_number = preg_replace('/\s+/', '', $_POST['numero_de_tarjeta']);
+            if (!ctype_digit($card_number) || strlen($card_number) !== 16) {
+                wc_add_notice('El número de tarjeta de crédito es inválido.', 'error');
+                return;
+            }
+            $card_month = (int) $_POST['mes'];
+            $card_year = (int) $_POST['anio'];
+            // if (!ctype_digit((string) $card_month) || !ctype_digit((string) $card_year) || $card_month < 1 || $card_month > 12 || $card_year < date('Y') || $card_year > date('Y') + 10) {
+            //     wc_add_notice('La fecha de expiración de la tarjeta de crédito es inválida.', 'error');
+            //     return;
+            // }
+            $card_cvc = $_POST['cvc'];
+            if (!ctype_digit($card_cvc) || strlen($card_cvc) < 3 || strlen($card_cvc) > 4) {
+                wc_add_notice('El código de seguridad de la tarjeta de crédito es inválido.', 'error');
+                return;
+            }
+            $amount = (float) $order->get_total();
+
             // Enviar los datos de pago al servicio externo
-            $ch = curl_init();
-            $apikey = 'pk4458cf90-2512-300b-b021-722c526f03c3';
+            $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
             $headers = array(
-                'apikey: pk4458cf90-2512-300b-b021-722c526f03c3',
+                'apikey: ' . $apikey,
                 'Content-Type: application/x-www-form-urlencoded',
             );
             $data = array(
-                'numero_de_tarjeta' => $_POST['numero_de_tarjeta'],
-                // 'nombre' => $_POST['nombre'],
-                'ano' => $_POST['anio'],
-                'mes' => $_POST['mes'],
-                'cvc' => $_POST['cvc'],
+                'numero_de_tarjeta' => $card_number,
+                'ano' => $card_year,
+                'mes' => $card_month,
+                'cvc' => $card_cvc,
                 'referencia' => $_POST['referencia'],
                 'direccion' => $_POST['direccion'],
-                'monto' => $order->total,
+                'monto' => $amount,
             );
-            // var_dump($body);
             $args = array(
                 'method' => 'POST',
                 'headers' => $headers,
                 'body' => http_build_query($data),
             );
-            // $response = wp_remote_post($url, $args);
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-            $response = curl_exec($ch);
-            // var_dump($response);
-            var_dump($response);
-            curl_close($ch);
-            $response_data = json_decode($response);
-            // var_dump($response_data);
-            var_dump($response_data);
-            // if (is_wp_error($response)) {
-            //     // var_dump($response);
-            //     echo "error no se establecio conexion";
-            //     wc_add_notice('Hubo un error al procesar el pago. Por favor, inténtelo de nuevo más tarde.', 'error');
-            //     return;
-            // } else {
-            //     // echo "conexion establecida";
-            //     var_dump($response);
-            //     // echo "<br/>";
-            //     if($response->ok){
-            //         echo "pago exitoso";
-            //     }
-            //     else{
-            //         echo "pago fallido, revise los datos de su tarjeta";
-            //         // var_dump($response);
-            //     }
-            // }
-
-            
-
+            $response = wp_remote_post($url, $args);
+            if (is_wp_error($response)) {
+                var_dump($response);
+                wc_add_notice('Hubo un error al procesar el pago. Por favor, inténtelo de nuevo más tarde.', 'error');
+                return;
+            } else {
+                $response_data = json_decode(wp_remote_retrieve_body($response));
+                if (!$response_data->ok) {
+                    wc_add_notice('El pago no se pudo procesar. Por favor, revise los datos de su tarjeta.', 'error');
+                    return;
+                }
+                if ($response_data->monto != $amount) {
+                    wc_add_notice('El monto del pago no coincide con el monto del pedido.', 'error');
+                    return;
+                }
+                // El pago se procesó correctamente, actualizamos el estado del pedido en WooCommerce y redirigimos al usuario a la página de confirmación
+                $order->payment_complete();
+                $order->reduce_order_stock();
+                $woocommerce->cart->empty_cart();
+                wp_safe_redirect($this->get_return_url($order));
+            }
         }
+
     }
 }
