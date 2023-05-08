@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: BancaAmiga
+Plugin Name: BancaAmigaApi
 Plugin URI:
 Description: Integracion con api para pasarela de pago en banca amiga
 Version: 1.0
@@ -13,31 +13,30 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-// Agregar el método de pago a la sección de ajustes de pagos de WooCommerce
-// Hook to add the custom payment method
-// add_filter('woocommerce_payment_gateways', 'add_custom_gateway');
+
 
 // Registre su método de pago personalizado en WooCommerce
-add_filter('woocommerce_payment_gateways', 'agregar_mi_metodo_pago');
-function agregar_mi_metodo_pago($gateways)
+add_filter('woocommerce_payment_gateways', 'banca_amiga_payment_gateway');
+function banca_amiga_payment_gateway($gateways)
 {
-    $gateways[] = 'WC_Mi_Metodo_Pago';
+    $gateways[] = 'wc_banca_amiga';
     return $gateways;
 }
 
 // Incluya la clase de su método de pago personalizado
-add_action('plugins_loaded', 'init_wc_mi_metodo_pago');
-function init_wc_mi_metodo_pago()
+add_action('plugins_loaded', 'init_wc_banca_amiga');
+function init_wc_banca_amiga()
 {
 
-    class WC_Mi_Metodo_Pago extends WC_Payment_Gateway
+    class wc_banca_amiga extends WC_Payment_Gateway
     {
 
         // Constructor
         public function __construct()
         {
-            $this->id = 'mi_metodo_pago';
-            $this->method_title = __('Mi Método de Pago', 'woocommerce');
+            $this->id = 'mi_metodo_pago_banca_amiga';
+            $this->method_title = __('Banca Amiga', 'woocommerce');
+            $this->method_description = __('Integracion con api para pasarela de pago en banca amiga', 'woocommerce');
             $this->has_fields = true;
 
             // Cargue los ajustes del método de pago
@@ -52,16 +51,16 @@ function init_wc_mi_metodo_pago()
         public function init_form_fields()
         {
             $this->form_fields = array(
-                'enabled' => array(
-                    'title' => __('Habilitar/Inhabilitar', 'woocommerce'),
-                    'type' => 'checkbox',
-                    'label' => __('Habilitar Mi Método de Pago', 'woocommerce'),
-                    'default' => 'yes',
-                ),
                 'apikey' => array(
                     'title' => __('API Key', 'woocommerce'),
                     'type' => 'text',
                     'description' => __('Ingrese su API Key.', 'woocommerce'),
+                    'default' => '',
+                ),
+                'headers' => array(
+                    'title' => __('Tipo de Encabezado', 'woocommerce'),
+                    'type' => 'text',
+                    'description' => __('Ingrese el tipo de encabezado.', 'woocommerce'),
                     'default' => '',
                 ),
             );
@@ -87,14 +86,11 @@ function init_wc_mi_metodo_pago()
         {
             global $woocommerce;
             $order = wc_get_order($order_id);
-            $apikey = $this->get_option('apikey');
-
             // Verificar que se hayan enviado todos los datos necesarios
-            if (!isset($_POST['numero_de_tarjeta']) || !isset($_POST['anio']) || !isset($_POST['mes']) || !isset($_POST['cvc']) || !isset($_POST['referencia']) || !isset($_POST['direccion'])) {
+            if (!isset($_POST['numero_de_tarjeta']) || !isset($_POST['anio']) || !isset($_POST['mes']) || !isset($_POST['cvc']) || !isset($_POST['direccion'])) {
                 wc_add_notice('Por favor, complete todos los campos requeridos.', 'error');
                 return;
             }
-
             // Validar los datos de la tarjeta de crédito
             $card_number = preg_replace('/\s+/', '', $_POST['numero_de_tarjeta']);
             if (!ctype_digit($card_number) || strlen($card_number) !== 16) {
@@ -113,19 +109,23 @@ function init_wc_mi_metodo_pago()
                 return;
             }
             $amount = (float) $order->get_total();
+            // $apikey = ;
 
             // Enviar los datos de pago al servicio externo
             $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
+
             $headers = array(
-                'apikey: ' . $apikey,
-                'Content-Type: application/x-www-form-urlencoded',
+                'apikey' => $apikey = $this->get_option('apikey'),
+                'Content-Type' => $this->get_option('headers'),
             );
             $data = array(
-                'numero_de_tarjeta' => $card_number,
+                'numero' => $card_number,
                 'ano' => $card_year,
+                'nombre' => $_POST['nombre'],
+                'apellido' => $_POST['apellido'],
                 'mes' => $card_month,
                 'cvc' => $card_cvc,
-                'referencia' => $_POST['referencia'],
+                'referencia' => $order_id,
                 'direccion' => $_POST['direccion'],
                 'monto' => $amount,
             );
@@ -133,6 +133,7 @@ function init_wc_mi_metodo_pago()
                 'method' => 'POST',
                 'headers' => $headers,
                 'body' => http_build_query($data),
+                'sslverify' => false,
             );
             $response = wp_remote_post($url, $args);
             if (is_wp_error($response)) {
@@ -141,8 +142,9 @@ function init_wc_mi_metodo_pago()
                 return;
             } else {
                 $response_data = json_decode(wp_remote_retrieve_body($response));
+                var_dump($response_data->mensaje);
                 if (!$response_data->ok) {
-                    wc_add_notice('El pago no se pudo procesar. Por favor, revise los datos de su tarjeta.', 'error');
+                    wc_add_notice($response_data->mensaje, 'error');
                     return;
                 }
                 if ($response_data->monto != $amount) {
