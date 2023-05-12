@@ -13,8 +13,6 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-
-
 // Registre su método de pago personalizado en WooCommerce
 add_filter('woocommerce_payment_gateways', 'banca_amiga_payment_gateway');
 function banca_amiga_payment_gateway($gateways)
@@ -155,9 +153,12 @@ function init_wc_banca_amiga()
                 $order->payment_complete();
                 $order->reduce_order_stock();
                 $woocommerce->cart->empty_cart();
+                
                 wp_safe_redirect($this->get_return_url($order));
             }
         }
 
     }
+
+    
 }
