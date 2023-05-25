@@ -68,7 +68,7 @@ function init_wc_banca_amiga()
         public function payment_fields()
         {
             ?>
-            <p><?php _e('Ingrese los detalles de su tarjeta de pago internacional:', 'woocommerce');?></p>
+            <p><?php _e('Cree la orden:', 'woocommerce');?></p>
             <fieldset id="wc-<?php echo esc_attr($this->id); ?>-cc-form">
                 <?php
 
@@ -79,86 +79,145 @@ function init_wc_banca_amiga()
             <?php
 }
 
-        // Procese el pago y devuelva el resultado
-        public function process_payment($order_id)
-        {
-            global $woocommerce;
-            $order = wc_get_order($order_id);
-            // Verificar que se hayan enviado todos los datos necesarios
-            if (!isset($_POST['numero_de_tarjeta']) || !isset($_POST['anio']) || !isset($_POST['mes']) || !isset($_POST['cvc']) || !isset($_POST['direccion'])) {
-                wc_add_notice('Por favor, complete todos los campos requeridos.', 'error');
-                return;
-            }
-            // Validar los datos de la tarjeta de crédito
-            $card_number = preg_replace('/\s+/', '', $_POST['numero_de_tarjeta']);
-            if (!ctype_digit($card_number) || strlen($card_number) !== 16) {
-                wc_add_notice('El número de tarjeta de crédito es inválido.', 'error');
-                return;
-            }
-            $card_month = (int) $_POST['mes'];
-            $card_year = (int) $_POST['anio'];
-            // if (!ctype_digit((string) $card_month) || !ctype_digit((string) $card_year) || $card_month < 1 || $card_month > 12 || $card_year < date('Y') || $card_year > date('Y') + 10) {
-            //     wc_add_notice('La fecha de expiración de la tarjeta de crédito es inválida.', 'error');
-            //     return;
-            // }
-            $card_cvc = $_POST['cvc'];
-            if (!ctype_digit($card_cvc) || strlen($card_cvc) < 3 || strlen($card_cvc) > 4) {
-                wc_add_notice('El código de seguridad de la tarjeta de crédito es inválido.', 'error');
-                return;
-            }
-            $amount = (float) $order->get_total();
-            // $apikey = ;
-
-            // Enviar los datos de pago al servicio externo
-            $url = 'https://devpagos.sitca-ve.com/api/v1/cargo';
-
-            $headers = array(
-                'apikey' => $apikey = $this->get_option('apikey'),
-                'Content-Type' => $this->get_option('headers'),
-            );
-            $data = array(
-                'numero' => $card_number,
-                'ano' => $card_year,
-                'nombre' => $_POST['nombre'],
-                'apellido' => $_POST['apellido'],
-                'mes' => $card_month,
-                'cvc' => $card_cvc,
-                'referencia' => $order_id,
-                'direccion' => $_POST['direccion'],
-                'monto' => $amount,
-            );
-            $args = array(
-                'method' => 'POST',
-                'headers' => $headers,
-                'body' => http_build_query($data),
-                'sslverify' => false,
-            );
-            $response = wp_remote_post($url, $args);
-            if (is_wp_error($response)) {
-                var_dump($response);
-                wc_add_notice('Hubo un error al procesar el pago. Por favor, inténtelo de nuevo más tarde.', 'error');
-                return;
-            } else {
-                $response_data = json_decode(wp_remote_retrieve_body($response));
-                var_dump($response_data->mensaje);
-                if (!$response_data->ok) {
-                    wc_add_notice($response_data->mensaje, 'error');
-                    return;
-                }
-                if ($response_data->monto != $amount) {
-                    wc_add_notice('El monto del pago no coincide con el monto del pedido.', 'error');
-                    return;
-                }
-                // El pago se procesó correctamente, actualizamos el estado del pedido en WooCommerce y redirigimos al usuario a la página de confirmación
-                $order->payment_complete();
-                $order->reduce_order_stock();
-                $woocommerce->cart->empty_cart();
-                
-                wp_safe_redirect($this->get_return_url($order));
-            }
+public function process_payment( $order_id ) {
+    $order = wc_get_order( $order_id );
+    $descripcion = $_POST['billing']['descripcion_compra'];
+    $monto = $order->get_total();
+    $url = 'https://payments3ds.bancamiga.com/sandbox/init/cdd69752-1dd2-48d7-b2f0-f3b15cb2476b';
+    $args = array(
+                   'headers' => array(
+                    'Authorization' => 'Bearer sandbox_7625372:1',
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                ),
+                'body' => array(
+                    'Descripcion' => "descripcion",
+                    'Monto' => $monto,
+                    "Externalid" => "A-100001",
+                    "Urldone" => "https://bancamiga.com/done",
+                    "Urlcancel" => "https://bancamiga.com/cancel",
+                    "Dni" => "V00000000",
+                    "Ref" => "321654987",
+                    "Name" => "kervis"
+                ),
+    );
+    $response = wp_remote_post( $url, $args );
+    // var_dump( $response );
+    if ( is_wp_error( $response ) ) {
+        // Si se produjo un error al crear la orden de compra en el servidor externo
+        wc_add_notice( $response->get_error_message(), 'error' );
+        return;
+    } else {
+        // Si la orden de compra se creó correctamente en el servidor externo
+        $response_body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $response_body, true );
+        if ( $data['status'] == 200 ) {
+            // Si el servidor externo devolvió un código de estado 200 OK
+            $mensaje_success = $data['mensaje'];
+            wc_add_notice( $mensaje_success, 'success' );
+            $url_pago = str_replace( '{{ TOKEN }}', $data['data']['Token'], $data['data']['url'] );
+            // Mostrar la ventana modal con la URL de pago
+            wc_enqueue_js( "
+                jQuery('#modal-pago-bancamiga').html('<p>Haga clic en el botón para completar el pago:</p><p><a class=\'button\' href=\'$url_pago\' target=\'_blank\'>Completar Pago</a></p>');
+                jQuery('#modal-pago-bancamiga').dialog({
+                    modal: true,
+                    width: 600,
+                    height: 400,
+                    close: function(event, ui) {
+                        // Si se cierra la ventana modal, redirigir al usuario a la página de agradecimiento de compra
+                        window.location.href = '" . $this->get_return_url( $order ) . "';
+                    }
+                });
+            " );
+        } else {
+            // Si el servidor externo devolvió un código de estado distinto de 200 OK
+            $mensaje_error = $data['mensaje'];
+            wc_add_notice( $mensaje_error, 'error' );
+            return;
         }
-
     }
+}
 
-    
+// Agregar el contenido de la ventana modal al pie de página
+public function add_modal_content() {
+    echo '<div id="modal-pago-bancamiga" title="Completar Pago"></div>';
+}
+
+// Agregar el botón de "Realizar Pedido" que abre la ventana modal
+public function add_pay_button() {
+    echo '<button type="submit" class="button alt" id="boton-pago-bancamiga">' . __( 'Realizar Pedido', 'woocommerce' ) . '</button>';
+    wc_enqueue_js( "
+        jQuery('#boton-pago-bancamiga').click(function(event) {
+            event.preventDefault();
+            jQuery('#order_review').block({
+                message: null,
+                overlayCSS: {
+                    background: '#fff',
+                    opacity: 0.6
+                }
+            });
+            jQuery('form.checkout').submit();
+        });
+    " );
+}
+
+
+        // public function process_payment($order_id)
+        // {
+        //     $order = wc_get_order($order_id);
+        //     echo $order;
+        //     $descripcion = $_POST['billing']['descripcion_compra'];
+        //     $monto = $order->get_total();
+        //     $url = 'https://payments3ds.bancamiga.com/sandbox/init/cdd69752-1dd2-48d7-b2f0-f3b15cb2476b';
+        //     $args = array(
+        //         'headers' => array(
+        //             'Authorization' => 'Bearer sandbox_7625372:1',
+        //             'Content-Type' => 'application/x-www-form-urlencoded',
+        //         ),
+        //         'body' => array(
+        //             'Descripcion' => "descripcion",
+        //             'Monto' => $monto,
+        //             "Externalid" => "A-100001",
+        //             "Urldone" => "https://bancamiga.com/done",
+        //             "Urlcancel" => "https://bancamiga.com/cancel",
+        //             "Dni" => "V00000000",
+        //             "Ref" => "321654987",
+        //             "Name" => "kervis"
+        //         ),
+        //     );
+        //     $response = wp_remote_post($url, $args);
+        //     if (is_wp_error($response)) {
+        //         // Si se produjo un error al crear la orden de compra en el servidor externo
+        //         wc_add_notice($response->get_error_message(), 'error');
+        //         return;
+        //     } else {
+        //         // Si la orden de compra se creó correctamente en el servidor externo
+        //         $response_body = wp_remote_retrieve_body($response);
+        //         $data = json_decode($response_body, true);
+        //         if ($data['status'] == 200) {
+        //             // Si el servidor externo devolvió un código de estado 200 OK
+        //             $url_pago = str_replace('{{ TOKEN }}', $data['data']['Token'], $data['data']['url']);
+        //             // Redirigir al usuario al formulario de pago en el servidor externo
+        //             return array(
+        //                 'result' => 'success',
+        //                 'redirect' => $url_pago,
+        //             );
+        //         } else {
+        //             //Continuación del código anterior:
+
+        //             // Si el servidor externo devolvió un código de estado distinto de 200 OK
+        //             $mensaje_error = $data['mensaje'];
+        //             wc_add_notice($mensaje_error, 'error');
+        //             return;
+        //         }
+        //     }
+        // }
+    }
+    // // Registrar la clase de la pasarela de pago
+    // add_filter('woocommerce_payment_gateways', 'agregar_pasarela_pago');
+    // function agregar_pasarela_pago($methods)
+    // {
+    //     $methods[] = 'WC_Pasarela_Pago_External';
+    //     return $methods;
+    // }
+
 }
