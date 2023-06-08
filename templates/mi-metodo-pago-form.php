@@ -2,4 +2,7 @@
 if (!defined('ABSPATH')) {
     exit;
 }
-?><a href="https://payments3ds.bancamiga.com/sandbox/payment/{{ TOKEN }}">Pagar Orden</a>
+?>
+<div id="boton-pago-bancamiga">Boton</div>
+
+<!-- <a href="https://payments3ds.bancamiga.com/sandbox/payment/{{ TOKEN }}">Pagar Orden</a> -->
