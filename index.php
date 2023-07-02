@@ -27,7 +27,11 @@ function cargar_script_modal_bancamiga()
     }
 }
 add_action('wp_enqueue_scripts', 'cargar_script_modal_bancamiga');
-
+add_action('woocommerce_checkout_before_order_review', 'mi_plugin_formulario_de_pago');
+function  mi_plugin_formulario_de_pago()
+{
+    echo '<div id="order_review">Boton</div>';
+}
 // Incluya la clase de su método de pago personalizado
 add_action('plugins_loaded', 'init_wc_banca_amiga');
 function init_wc_banca_amiga()
@@ -71,7 +75,7 @@ function init_wc_banca_amiga()
             );
         }
       
-        get_template_part('templates/mi-metodo-pago-form');
+        // get_template_part('templates/mi-metodo-pago-form');
         // Muestre los campos del método de pago en el checkout
 
         public function process_payment($order_id)
@@ -89,7 +93,7 @@ function init_wc_banca_amiga()
                     'Descripcion' => "descripcion",
                     'Monto' => $monto,
                     "Externalid" => "A-100001",
-                    "Urldone" => "https://bancamiga.com/done",
+                    "Urldone" => "http://localhost:8080/wordpress/finalizar-compra/",
                     "Urlcancel" => "https://bancamiga.com/cancel",
                     "Dni" => "V00000000",
                     "Ref" => "321654987",
@@ -103,6 +107,7 @@ function init_wc_banca_amiga()
                 wc_add_notice($response->get_error_message(), 'error');
                 return;
             } else {
+
                 // Si la orden de compra se creó correctamente en el servidor externo
                 $response_body = wp_remote_retrieve_body($response);
                 $data = json_decode($response_body, true);
@@ -110,14 +115,15 @@ function init_wc_banca_amiga()
                     $mensaje_success = $data['mensaje'];
                     wc_add_notice($mensaje_success, 'success');
                     $url_pago = $data['data']['url'];
-
+                    header("Location: $url_pago");
+ 
                     // Mostrar el botón con el enlace de pago
-                    wc_enqueue_js("
-                        jQuery('#boton-pago-bancamiga').html('<a class=\'button\' href=\'$url_pago\' target=\'_blank\' id=\'completar-pago-bancamiga\'>Completar Pago</a>');
-                    ");
+                    // wc_enqueue_js("
+                    //     jQuery('#order_review').html('<a class=\'button\' href=\'$url_pago\' target=\'_blank\' id=\'completar-pago-bancamiga\'>Completar Pago</a>');
+                    // ");
 
                     // Agregar el botón de pago después del botón de realizar pedido de WooCommerce
-                    add_action('woocommerce_review_order_after_submit', array($this, 'add_pay_button'));
+                    // add_action('woocommerce_review_order_after_submit', array($this, 'add_pay_button'));
                 } else {
                     // Si el servidor externo devolvió un código de estado distinto de 200 OK
                     $mensaje_error = $data['mensaje'];
@@ -130,7 +136,7 @@ function init_wc_banca_amiga()
         // Agregar el botón de "Completar Pago"
         public function add_pay_button()
         {
-            echo '<div id="boton-pago-bancamiga" style="margin-top: 20px;"><a class="button" id="abrir-modal-bancamiga" href="#">Completar Pago con Banca Amiga</a></div>';
+            echo '<div id="order_review" style="margin-top: 20px;"><a class="button" id="abrir-modal-bancamiga" href="#">Completar Pago con Banca Amiga</a></div>';
             echo '<div id="modal-bancamiga" class="modal" style="display: none;"><div class="modal-content"><span class="close">&times;</span><p>Contenido para la ventana modal aquí.</p></div></div>';
         }
     }
